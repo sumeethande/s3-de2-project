@@ -1,0 +1,5 @@
+functions-framework==3.*
+requests==2.31.0
+google-cloud-bigquery==3.14.1
+pandas==2.1.4
+pyarrow==14.0.2
