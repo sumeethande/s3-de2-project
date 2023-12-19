@@ -3,10 +3,10 @@ import requests
 import os
 from google.cloud import bigquery
 import pandas as pd
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 
 @functions_framework.http
-def hello_http(request):
+def fuel_data_fetch(request):
 
     #Initializing all variables
     url = "https://creativecommons.tankerkoenig.de/json/list.php"
@@ -62,13 +62,12 @@ def hello_http(request):
             stations = raw_json["stations"]
             stations_list = []
             for station in stations:
-                # timestamp = datetime.now().timestamp()
-                timestamp = datetime.now()
-                formatted_time = datetime.fromtimestamp(timestamp.timestamp()).strftime('%Y-%m-%d %H:%M:%S.%f')
+                datetime_obj = datetime.now()
+                formatted_time = datetime_obj.strftime('%Y-%m-%d %H:%M:%S.%f')
                 unique_id = station["id"] + "_" + formatted_time
                 station_row = []
                 station_row.append(unique_id)
-                station_row.append(timestamp)
+                station_row.append(formatted_time)
                 for key, value in station.items():
                     station_row.append(value)
                 stations_list.append(station_row)
@@ -84,7 +83,7 @@ def hello_http(request):
             # Define the schema explicitly with correct types
             schema = [
                 bigquery.SchemaField("unique_id", "STRING"),
-                bigquery.SchemaField("timestamp", "TIMESTAMP"),
+                bigquery.SchemaField("timestamp", "STRING"),
                 bigquery.SchemaField("station_id", "STRING"),
                 bigquery.SchemaField("station_name", "STRING"),
                 bigquery.SchemaField("brand", "STRING"),
@@ -126,6 +125,7 @@ def hello_http(request):
                 history_table = client.create_table(history_table)
                 print(f"Table {history_table_id} created successfully with schema: {schema}")
 
+            
             copy_query = f"""
                 INSERT INTO `{project_id}.{dataset_id}.{history_table_id}`
                 SELECT * FROM `{project_id}.{dataset_id}.{live_table_id}`;
@@ -133,6 +133,7 @@ def hello_http(request):
             copy_job = client.query(copy_query)
             # Wait for the copy job to complete
             copy_job.result()
+            print("Data copied from live table to history table successfully.")
 
             #Insert data into live table with 'replace' option
             job_config = bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE")
@@ -140,6 +141,7 @@ def hello_http(request):
 
             # Wait for the job to complete
             job.result()
+            print("New data replaced in live table successfully.")
 
             return "Data replaced/inserted successfully."
         else:
