@@ -3,7 +3,7 @@ import requests
 import os
 from google.cloud import bigquery
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 @functions_framework.http
 def hello_http(request):
@@ -62,12 +62,13 @@ def hello_http(request):
             stations = raw_json["stations"]
             stations_list = []
             for station in stations:
-                timestamp = datetime.now().timestamp()
-                formatted_time = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+                # timestamp = datetime.now().timestamp()
+                timestamp = datetime.now()
+                formatted_time = datetime.fromtimestamp(timestamp.timestamp()).strftime('%Y-%m-%d %H:%M:%S.%f')
                 unique_id = station["id"] + "_" + formatted_time
                 station_row = []
                 station_row.append(unique_id)
-                station_row.append(formatted_time)
+                station_row.append(timestamp)
                 for key, value in station.items():
                     station_row.append(value)
                 stations_list.append(station_row)
@@ -83,7 +84,7 @@ def hello_http(request):
             # Define the schema explicitly with correct types
             schema = [
                 bigquery.SchemaField("unique_id", "STRING"),
-                bigquery.SchemaField("timestamp", "STRING"),
+                bigquery.SchemaField("timestamp", "TIMESTAMP"),
                 bigquery.SchemaField("station_id", "STRING"),
                 bigquery.SchemaField("station_name", "STRING"),
                 bigquery.SchemaField("brand", "STRING"),
@@ -125,22 +126,6 @@ def hello_http(request):
                 history_table = client.create_table(history_table)
                 print(f"Table {history_table_id} created successfully with schema: {schema}")
 
-            #Fetch current data from live table
-            # query=f"SELECT * FROM `{project_id}.{dataset_id}.{live_table_id}`"
-            # data_get_job = client.query(query)
-            # live_data_rows = data_get_job.result()
-
-            # rows_to_insert = []
-
-            # for live_row in live_data_rows:
-            #     history_row = {field.name: live_row[field.name] for field in schema}
-            #     rows_to_insert.append(history_row)
-
-            # #Append current data of live table to history table
-            # transfer_job_config = bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
-            # transfer_job = client.insert_rows(rows_to_insert, history_table_ref, job_config=transfer_job_config)
-            # transfer_job.result()
-            
             copy_query = f"""
                 INSERT INTO `{project_id}.{dataset_id}.{history_table_id}`
                 SELECT * FROM `{project_id}.{dataset_id}.{live_table_id}`;
